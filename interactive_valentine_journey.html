@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cupid RPG</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Poppins&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:url("clouds.png") center/cover no-repeat fixed;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-family:Poppins,sans-serif;
+}
+
+#game{
+  width:1100px;
+  height:90vh;
+  background:rgba(255,255,255,0.93);
+  border-radius:20px;
+  box-shadow:0 0 40px rgba(0,0,0,0.3);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+#scene{flex:1;position:relative;}
+
+#cupid{
+  position:absolute;
+  top:15px;
+  left:50%;
+  transform:translateX(-50%);
+  width:180px;
+  animation:float 3s ease-in-out infinite;
+  z-index:5;
+}
+
+@keyframes float{
+  0%{transform:translate(-50%,0)}
+  50%{transform:translate(-50%,-12px)}
+  100%{transform:translate(-50%,0)}
+}
+
+canvas{width:100%;height:100%;image-rendering:pixelated;}
+
+#ui{
+  height:35%;
+  background:linear-gradient(#3f6fa6,#2b4f77);
+  border-top:4px solid gold;
+  color:white;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+
+#name{font-family:"Press Start 2P";font-size:12px;color:#ffd6e5;}
+
+#text{font-size:18px;min-height:100px;line-height:1.7;}
+
+#choices{display:flex;flex-direction:column;gap:8px;}
+
+.choice{
+  background:#5b8ec9;
+  border:2px solid gold;
+  border-radius:6px;
+  padding:8px 14px;
+  color:white;
+  cursor:pointer;
+  transition:.2s;
+  font-size:15px;
+}
+
+.choice:hover{background:#78aee8;transform:translateX(5px);}
+
+#footer{background:#111;color:#777;font-size:11px;padding:6px 15px;text-align:right;}
+</style>
+</head>
+<body>
+
+<div id="game">
+
+<div id="scene">
+<img src="cupid.png" id="cupid">
+<canvas id="canvas" width="320" height="180"></canvas>
+</div>
+
+<div id="ui">
+<div>
+<div id="name"></div>
+<div id="text"></div>
+</div>
+<div id="choices"></div>
+</div>
+
+<div id="footer">CUPID RPG</div>
+
+</div>
+
+<script>
+
+/* ================= CANVAS ================= */
+
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+
+function clear(c){ctx.fillStyle=c;ctx.fillRect(0,0,320,180);} 
+function pixel(x,y,c){ctx.fillStyle=c;ctx.fillRect(x,y,1,1);} 
+
+function sky(day=true){clear(day?"#7cc9ff":"#061a3a");}
+function sun(){ctx.fillStyle="#ffd700";ctx.beginPath();ctx.arc(270,30,12,0,Math.PI*2);ctx.fill();}
+function stars(){for(let i=0;i<80;i++)pixel(Math.random()*320,Math.random()*120,"#fff");}
+function ground(c){ctx.fillStyle=c;ctx.fillRect(0,120,320,60);} 
+function pond(){ctx.fillStyle="#2b7de9";ctx.beginPath();ctx.ellipse(160,135,70,15,0,0,Math.PI*2);ctx.fill();}
+function bench(){ctx.fillStyle="#6b3e1e";ctx.fillRect(110,110,100,6);ctx.fillRect(120,116,6,18);ctx.fillRect(190,116,6,18);} 
+function trees(){for(let i=0;i<6;i++){let x=30+i*45;ctx.fillStyle="#5b3a1a";ctx.fillRect(x,80,6,40);ctx.fillStyle="#2f8f2f";ctx.beginPath();ctx.arc(x+3,70,18,0,Math.PI*2);ctx.fill();}}
+function city(){for(let i=0;i<10;i++){let h=40+Math.random()*50;ctx.fillStyle="#222";ctx.fillRect(i*32,120-h,25,h);}}
+function desk(){ctx.fillStyle="#663300";ctx.fillRect(40,110,240,20);ctx.fillRect(90,90,60,20);} 
+function cafe(){clear("#b88b5a");ctx.fillStyle="#654321";ctx.fillRect(50,100,220,30);}
+function rain(){sky(false);stars();ground("#333");for(let i=0;i<80;i++)pixel(Math.random()*320,Math.random()*180,"#88aaff");}
+
+const scenes={
+menu(){sky();sun();ground("#7dbb5f");trees();},
+park(){sky();sun();ground("#6ab04c");pond();bench();trees();},
+travel(){sky();ground("#999");city();},
+night(){sky(false);stars();ground("#222");},
+office(){clear("#333");desk();},
+room(){clear("#ccc");ctx.fillStyle="#999";ctx.fillRect(70,90,180,40);},
+beach(){sky();ground("#f2d16b");ctx.fillStyle="#1c6cd5";ctx.fillRect(0,110,320,15);},
+cafe(){cafe();},
+rain(){rain();}
+};
+
+/* ================= STORY ================= */
+
+let unlocked=false;
+let flags={};
+
+const story={
+
+start:{
+name:"Cupid",
+text:"I’m breaking celestial protocol for you. So make this count. Three paths. Many messes. Pick wisely. Or don’t.",
+scene:"menu",
+choices:[
+{t:"Okay…",n:"menu"},
+{t:"I’m scared",n:"menu"}
+]},
+
+menu:{
+name:"Cupid",
+text:"Different lives. Same heart. Where to?",
+scene:"menu",
+get(){
+let c=[
+{t:"🌍 Adventure",n:"ad1"},
+{t:"💼 Ambition",n:"am1"},
+{t:"🌸 Peace",n:"p1"}
+];
+if(unlocked)c.push({t:"Sagnik?!",n:"us1"});
+return c;
+}
+},
+
+/* ========== ADVENTURE BRANCHING ========== */
+
+ad1:{name:"Narrator",text:"You triple-check tickets, hotels, and emergency snacks. She watches, amused.",scene:"travel",choices:[
+{t:"Recheck everything",n:"ad2a"},
+{t:"Relax a bit",n:"ad2b"}
+]},
+
+ad2a:{name:"Narrator",text:"You find nothing wrong. Still anxious. Impressive.",scene:"travel",next:"ad3"},
+ad2b:{name:"Narrator",text:"You close your laptop. She cheers quietly.",scene:"travel",next:"ad3"},
+
+ad3:{name:"Narrator",text:"Train delay. Naturally.",scene:"travel",choices:[
+{t:"Complain online",n:"ad4a"},
+{t:"Joke about it",n:"ad4b"}
+]},
+
+ad4a:{name:"Narrator",text:"Your tweet gets zero likes. She laughs anyway.",scene:"night",next:"ad5"},
+ad4b:{name:"Narrator",text:"Your joke is bad. She loves it.",scene:"night",next:"ad5"},
+
+ad5:{name:"Narrator",text:"Beach at sunset. Everything feels okay.",scene:"beach",choices:[
+{t:"Take photos",n:"ad6a"},
+{t:"Just watch",n:"ad6b"}
+]},
+
+ad6a:{name:"Narrator",text:"You take too many photos. She steals one.",scene:"beach",next:"ad7"},
+ad6b:{name:"Narrator",text:"You stay silent together.",scene:"beach",next:"ad7"},
+
+ad7:{name:"Narrator",text:"You get lost. Again.",scene:"travel",choices:[
+{t:"Panic",n:"ad8a"},
+{t:"Trust her",n:"ad8b"}
+]},
+
+ad8a:{name:"Narrator",text:"She calms you down. Patiently.",scene:"travel",next:"ad9"},
+ad8b:{name:"Narrator",text:"She leads confidently.",scene:"travel",next:"ad9"},
+
+ad9:{name:"Narrator",text:"Late-night café. Quiet talks.",scene:"cafe",choices:[
+{t:"Open up",n:"ad10a"},
+{t:"Stay funny",n:"ad10b"}
+]},
+
+ad10a:{name:"Narrator",text:"You admit you’re scared of messing up.",scene:"cafe",next:"unlock"},
+ad10b:{name:"Narrator",text:"You hide it with jokes. She sees through it.",scene:"cafe",next:"unlock"},
+
+/* ========== AMBITION BRANCHING ========== */
+
+am1:{name:"Narrator",text:"Your calendar is full. She isn’t on it.",scene:"room",choices:[
+{t:"Fix that",n:"am2a"},
+{t:"Ignore it",n:"am2b"}
+]},
+
+am2a:{name:"Narrator",text:"You schedule a date.",scene:"office",next:"am3"},
+am2b:{name:"Narrator",text:"Work comes first. Again.",scene:"office",next:"am3"},
+
+am3:{name:"Narrator",text:"Meeting runs late.",scene:"office",choices:[
+{t:"Leave early",n:"am4a"},
+{t:"Stay",n:"am4b"}
+]},
+
+am4a:{name:"Narrator",text:"You choose her. Rare.",scene:"night",next:"am5"},
+am4b:{name:"Narrator",text:"You choose work. Again.",scene:"night",next:"am5"},
+
+am5:{name:"Narrator",text:"Rainy evening. Missed calls.",scene:"rain",choices:[
+{t:"Call back",n:"am6a"},
+{t:"Text later",n:"am6b"}
+]},
+
+am6a:{name:"Narrator",text:"She sounds relieved.",scene:"room",next:"am7"},
+am6b:{name:"Narrator",text:"She sounds distant.",scene:"room",next:"am7"},
+
+am7:{name:"Narrator",text:"Promotion offer.",scene:"office",choices:[
+{t:"Accept",n:"am8a"},
+{t:"Hesitate",n:"am8b"}
+]},
+
+am8a:{name:"Narrator",text:"More work. More distance.",scene:"office",next:"am9"},
+am8b:{name:"Narrator",text:"You think of her first.",scene:"office",next:"am9"},
+
+am9:{name:"Narrator",text:"City lights. Heavy thoughts.",scene:"night",choices:[
+{t:"Change",n:"am10a"},
+{t:"Continue",n:"am10b"}
+]},
+
+am10a:{name:"Narrator",text:"You choose balance.",scene:"room",next:"unlock"},
+am10b:{name:"Narrator",text:"You choose ambition.",scene:"room",next:"unlock"},
+
+/* ========== PEACE BRANCHING ========== */
+
+p1:{name:"Narrator",text:"Morning sunlight. No plans.",scene:"room",choices:[
+{t:"Stay in",n:"p2a"},
+{t:"Go out",n:"p2b"}
+]},
+
+p2a:{name:"Narrator",text:"You read quietly.",scene:"room",next:"p3"},
+p2b:{name:"Narrator",text:"You walk outside.",scene:"park",next:"p3"},
+
+p3:{name:"Narrator",text:"You think of her.",scene:"park",choices:[
+{t:"Text",n:"p4a"},
+{t:"Don’t",n:"p4b"}
+]},
+
+p4a:{name:"Narrator",text:"She replies instantly.",scene:"room",next:"p5"},
+p4b:{name:"Narrator",text:"Silence.",scene:"room",next:"p5"},
+
+p5:{name:"Narrator",text:"Rain begins.",scene:"rain",choices:[
+{t:"Watch",n:"p6a"},
+{t:"Sleep",n:"p6b"}
+]},
+
+p6a:{name:"Narrator",text:"You feel peaceful. Lonely.",scene:"night",next:"p7"},
+p6b:{name:"Narrator",text:"Dream of her.",scene:"night",next:"p7"},
+
+p7:{name:"Narrator",text:"Evening walk.",scene:"park",choices:[
+{t:"Reflect",n:"p8a"},
+{t:"Avoid",n:"p8b"}
+]},
+
+p8a:{name:"Narrator",text:"You want more.",scene:"park",next:"p9"},
+p8b:{name:"Narrator",text:"You stay comfortable.",scene:"park",next:"p9"},
+
+p9:{name:"Narrator",text:"Quiet room.",scene:"room",choices:[
+{t:"Reach out",n:"p10a"},
+{t:"Stay silent",n:"p10b"}
+]},
+
+p10a:{name:"Narrator",text:"You choose connection.",scene:"room",next:"unlock"},
+p10b:{name:"Narrator",text:"You choose safety.",scene:"room",next:"unlock"},
+
+/* UNLOCK */
+
+unlock:{
+name:"System",
+text:"A hidden path reveals itself…",
+scene:"menu",
+choices:[{t:"Continue",n:"menu"}]
+},
+
+/* US ROUTE */
+
+us1:{name:"Narrator",text:"That bench. That pond. Same butterflies.",scene:"park",next:"us2"},
+us2:{name:"Narrator",text:"You laugh at old memories.",scene:"park",next:"us3"},
+us3:{name:"Narrator",text:"Awkward first kiss. Perfect now.",scene:"park",next:"us4"},
+us4:{name:"Narrator",text:"You’re sure.",scene:"park",next:"us5"},
+us5:{name:"Cupid",text:"Okay. Say it.",scene:"menu",next:"finalAsk"},
+
+finalAsk:{name:"You",text:"I know I overthink. But I’m sure about you. Will you be my Valentine? 💖",scene:"menu",choices:[{t:"Yes ❤️",n:"final"}]},
+
+final:{name:"System",text:"ACHIEVEMENT: Our Story 💘",scene:"menu",choices:[{t:"Replay",n:"start"}]}
+
+};
+
+/* ================= ENGINE ================= */
+
+const nameBox=document.getElementById("name");
+const textBox=document.getElementById("text");
+const choicesBox=document.getElementById("choices");
+
+function load(key){
+
+if(key==="unlock")unlocked=true;
+
+let s=story[key];
+if(!s)return;
+
+nameBox.textContent=s.name;
+textBox.textContent=s.text;
+
+scenes[s.scene]();
+
+choicesBox.innerHTML="";
+
+let ch=[];
+
+if(s.get)ch=s.get();
+else if(s.choices)ch=s.choices;
+else if(s.next)ch=[{t:"Next",n:s.next}];
+
+ch.forEach(o=>{
+let b=document.createElement("button");
+b.className="choice";
+b.innerText=o.t;
+b.onclick=()=>load(o.n);
+choicesBox.appendChild(b);
+});
+
+}
+
+load("start");
+
+</script>
+</body>
+</html>
